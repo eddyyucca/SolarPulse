@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SolarPulse</title>
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="../logo.ico">
+    <link rel="stylesheet" href="../assets/css.css">
+</head>
+<body>
+    <!-- header -->
+    <div class="header">
+        <h1>SolarPulse</h1>
+        <ul class="menu">
+            <li><a href="#" onclick="location.reload()">Refresh</a></li>
+            <li><a href="http://localhost:8088/solarpulse/php/">Setting Devices</a></li>
+        </ul>
+        <!-- Toggle button for alarm -->
+        <div id="alarmButton" class="toggle-btn active" onclick="toggleAlarm()"></div>
+    </div>
+
+    <div class="container" id="deviceContainer">
+        <!-- Device boxes will be dynamically added here -->
+    </div>
+
+    <!-- Audio alert -->
+    <audio id="lowVoltageSound">
+        <source src="../alert.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        // Connect to WebSocket server
+        const socket = new WebSocket('ws://localhost:1010');
+
+        // Threshold for low voltage trigger
+        const voltageThreshold = 21.00;
+
+        // Set to store devices triggering alarm
+        const alarmTriggeredDevices = new Set();
+
+        // Initialize alarm status
+        let alarmEnabled = true;
+
+        // Handle WebSocket messages
+        socket.addEventListener('message', function (event) {
+            const message = JSON.parse(event.data);
+            if (message.type === 'device_status') {
+                updateDeviceStatusUI(message.data);
+            } else {
+                updateDevice(message);
+            }
+        });
+
+        // Function to update device status on UI
+        function updateDevice(deviceData) {
+            const deviceContainer = document.getElementById('deviceContainer');
+            const existingDeviceBox = document.getElementById(deviceData.ip);
+
+            if (existingDeviceBox) {
+                // Update existing device box
+                const voltageElement = existingDeviceBox.querySelector('.voltage');
+                const lastUpdateElement = existingDeviceBox.querySelector('.last-update');
+                voltageElement.textContent = `Voltage: ${deviceData.batteryVoltage}V`;
+                lastUpdateElement.textContent = `Last Update: ${new Date().toLocaleString()}`;
+
+                // Check if voltage is below threshold for color change and alarm
+                const voltage = parseFloat(deviceData.batteryVoltage);
+                if (voltage < 21.00) {
+                    existingDeviceBox.classList.add('below-threshold'); // Add below-threshold class
+                } else {
+                    existingDeviceBox.classList.remove('below-threshold'); // Remove below-threshold class
+                }
+
+                if (voltage < 20.00) {
+                    if (alarmEnabled) {
+                        playLowVoltageSound(); // Play low voltage sound
+                    }
+                }
+            } else {
+                // Create new device box
+                const newDeviceBox = document.createElement('div');
+                newDeviceBox.classList.add('device-box');
+                newDeviceBox.id = deviceData.ip;
+                newDeviceBox.innerHTML = `
+                    <div class="icon">🔋</div>
+                    <div class="info">
+                        <h3>${deviceData.name}</h3>
+                        <p class="voltage">Voltage: ${deviceData.batteryVoltage}V</p>
+                        <p class="last-update">Last Update: ${new Date().toLocaleString()}</p>
+                    </div>
+                `;
+
+                // Check if voltage is below threshold for color change and alarm
+                const voltage = parseFloat(deviceData.batteryVoltage);
+                if (voltage < 21.00) {
+                    newDeviceBox.classList.add('below-threshold'); // Add below-threshold class
+                    newDeviceBox.querySelector('.voltage').style.color = 'red'; // Change text color to red
+                }
+
+                if (voltage < 20.00) {
+                    if (alarmEnabled) {
+                        playLowVoltageSound(); // Play low voltage sound
+                    }
+                }
+
+                deviceContainer.appendChild(newDeviceBox);
+            }
+        }
+
+        // Function to play low voltage sound
+        function playLowVoltageSound() {
+            const lowVoltageSound = document.getElementById('lowVoltageSound');
+            lowVoltageSound.play();
+        }
+
+        // Toggle alarm function
+function toggleAlarm() {
+    alarmEnabled = !alarmEnabled; // Toggle alarm status
+    const alarmButton = document.getElementById('alarmButton');
+    alarmButton.classList.toggle('active', alarmEnabled);
+    
+    // Turn off sound if alarm is turned off
+    if (!alarmEnabled) {
+        soundEnabled = false;
+        const soundButton = document.getElementById('soundButton');
+        soundButton.classList.remove('active');
+    }}
+    </script>
+</body>
+
+</html>

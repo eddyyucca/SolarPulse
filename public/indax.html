@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time MPPT MORNINGSTAR - BUMA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .low-voltage {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Real-time MPPT MORNINGSTAR - BUMA</h1>
+    <table id="modbusTable">
+        <tr>
+            <th>IP Address</th>
+            <th>Device Name</th>
+            <th>Battery Voltage (V)</th>
+            <th>Last Update</th>
+        </tr>
+    </table>
+
+    <!-- Audio alert -->
+    <audio id="lowVoltageSound">
+        <source src="alaram.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <script>
+        const ws = new WebSocket('ws://localhost:1010');
+
+        ws.onopen = function () {
+            console.log('Connected to WebSocket server');
+        };
+
+        ws.onmessage = function (event) {
+            const modbusData = JSON.parse(event.data);
+            updateDeviceData(modbusData);
+        };
+
+        ws.onerror = function (error) {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = function () {
+            console.log('Connection closed');
+        };
+
+        function updateDeviceData(modbusData) {
+            const modbusTable = document.getElementById('modbusTable');
+
+            // Check if the device row already exists
+            let deviceRow = document.getElementById(modbusData.ip);
+            if (!deviceRow) {
+                // Create a new row for the device
+                deviceRow = document.createElement('tr');
+                deviceRow.setAttribute('id', modbusData.ip);
+                modbusTable.appendChild(deviceRow);
+
+                // Create cells for device IP, device name, battery voltage, and last update
+                const deviceIPCell = document.createElement('td');
+                deviceIPCell.textContent = modbusData.ip; // Display device IP
+                deviceRow.appendChild(deviceIPCell);
+
+                const deviceNameCell = document.createElement('td');
+                deviceNameCell.textContent = modbusData.name; // Display device name
+                deviceRow.appendChild(deviceNameCell);
+
+                const batteryVoltageCell = document.createElement('td');
+                batteryVoltageCell.setAttribute('id', `${modbusData.ip}-voltage`);
+                deviceRow.appendChild(batteryVoltageCell);
+
+                const lastUpdateCell = document.createElement('td');
+                lastUpdateCell.setAttribute('id', `${modbusData.ip}-timestamp`);
+                deviceRow.appendChild(lastUpdateCell);
+            }
+
+            // Update battery voltage and last update time
+            const batteryVoltageCell = document.getElementById(`${modbusData.ip}-voltage`);
+            batteryVoltageCell.textContent = modbusData.batteryVoltage;
+
+            // Check if the battery voltage is 25.64 V or below
+            const voltage = parseFloat(modbusData.batteryVoltage);
+            if (voltage <= 21.00) {
+                batteryVoltageCell.classList.add('low-voltage'); // Add class for styling
+                playLowVoltageSound(); // Play low voltage sound
+            } else {
+                batteryVoltageCell.classList.remove('low-voltage'); // Remove class if not low voltage
+            }
+
+            const lastUpdateCell = document.getElementById(`${modbusData.ip}-timestamp`);
+            lastUpdateCell.textContent = modbusData.timestamp;
+        }
+
+        // Function to play low voltage sound
+        function playLowVoltageSound() {
+            const lowVoltageSound = document.getElementById('lowVoltageSound');
+            lowVoltageSound.play();
+        }
+    </script>
+</body>
+
+</html>
